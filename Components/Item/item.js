@@ -1,7 +1,15 @@
-import React, { useState } from 'react';
-import { View, Text, Switch, TouchableOpacity, StyleSheet } from 'react-native';
+import React, {useState} from 'react';
+import {View, Text, Switch, TouchableOpacity, StyleSheet} from 'react-native';
 
-const Card = ({ title, description, isComplete, navigation, saveFunction ,id}) => {
+const Card = ({
+  title,
+  description,
+  isComplete,
+  navigation,
+  saveFunction,
+  id,
+  isSwiping,
+}) => {
   const [newisComplete, setnewIsComplete] = useState(isComplete);
   const toggleComplete = () => {
     const updatedIsComplete = !newisComplete;
@@ -11,13 +19,20 @@ const Card = ({ title, description, isComplete, navigation, saveFunction ,id}) =
       title,
       description,
       isComplete: updatedIsComplete,
-      id
+      id,
     });
-
   };
 
   const handlePress = () => {
-    navigation.navigate('ItemDetail', { title, description, isComplete, saveFunction,id });
+    if (!isSwiping) {
+      navigation.navigate('ItemDetail', {
+        title,
+        description,
+        isComplete,
+        saveFunction,
+        id,
+      });
+    }
   };
 
   return (
@@ -26,7 +41,7 @@ const Card = ({ title, description, isComplete, navigation, saveFunction ,id}) =
         <View
           style={[
             styles.card,
-            { backgroundColor: isComplete ? '#e6e6e6' : '#ffffff' },
+            {backgroundColor: isComplete ? '#e6e6e6' : '#ffffff'},
           ]}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.description}>{description}</Text>
@@ -34,8 +49,8 @@ const Card = ({ title, description, isComplete, navigation, saveFunction ,id}) =
         <View style={styles.toggleContainer}>
           <Text style={styles.toggleText}>Mark as Complete:</Text>
           <Switch
-            trackColor={{ false: "#767577", true: "#81b0ff" }}
-            thumbColor={isComplete ? "#f5dd4b" : "#f4f3f4"}
+            trackColor={{false: '#767577', true: '#81b0ff'}}
+            thumbColor={isComplete ? '#f5dd4b' : '#f4f3f4'}
             ios_backgroundColor="#3e3e3e"
             onValueChange={toggleComplete}
             value={isComplete}

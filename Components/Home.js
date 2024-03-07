@@ -1,42 +1,66 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, StatusBar } from 'react-native';
-import { NavigationContainer, useIsFocused } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import Card from './Item/item';
-import ItemDetailsScreen from './EditScreen/ItemDetails';
+import React, {useState, useEffect, useRef} from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  FlatList,
+  StatusBar,
+  Animated,
+  Easing,
+} from 'react-native';
+import {NavigationContainer, useIsFocused} from '@react-navigation/native';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import NewItemAddScreen from './newTask/input';
-import { MMKV } from 'react-native-mmkv';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
+import Card from './Item/item';
+import {MMKV} from 'react-native-mmkv';
+import ItemDetailsScreen from './EditScreen/ItemDetails';
 
 const mmkv = new MMKV();
 
-const HomeScreen = ({ navigation }) => {
+const HomeScreen = ({navigation}) => {
   const [currentTime, setCurrentTime] = useState('');
   const [currentDate, setCurrentDate] = useState('');
   const [items, setItems] = useState([]);
+  const [fadeAnim] = useState(new Animated.Value(1));
   const isFocused = useIsFocused();
-  const offsetX = useSharedValue(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const timerRef = useRef(null);
 
   useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 5000,
+      useNativeDriver: true,
+    }).start();
+
     const storedItems = mmkv.getString('items');
     const parsedItems = storedItems ? JSON.parse(storedItems) : [];
+    console.log('storedItems:', parsedItems);
     setItems(parsedItems);
 
-    const interval = setInterval(() => {
-      const now = new Date();
-      setCurrentTime(now.toLocaleTimeString());
-      setCurrentDate(now.toLocaleDateString());
-    }, 1000);
-
-    return () => clearInterval(interval);
+    if (isFocused) {
+      timerRef.current = setInterval(() => {
+        const now = new Date();
+        setCurrentTime(now.toLocaleTimeString());
+        setCurrentDate(now.toLocaleDateString());
+      }, 1000);
+    } else {
+      clearInterval(timerRef.current);
+    }
+    return () => clearInterval(timerRef.current);
   }, [isFocused]);
 
   const handleSaveItem = updatedItem => {
+    console.log('save function ', updatedItem);
     const index = items.findIndex(item => item.id === updatedItem.id);
+    console.log('index', items);
     if (index !== -1) {
       const updatedItems = [...items];
       updatedItems[index] = updatedItem;
+
       setItems(updatedItems);
       mmkv.set('items', JSON.stringify(updatedItems));
     }
@@ -44,29 +68,51 @@ const HomeScreen = ({ navigation }) => {
 
   const handleAddItem = newItem => {
     const updatedItems = [...items, ...newItem];
-    setItems(updatedItems);
     mmkv.set('items', JSON.stringify(updatedItems));
+    setItems(updatedItems);
   };
 
   const handleDeleteItem = id => {
+    console.log('hii', id);
     const updatedItems = items.filter(item => item.id !== id);
-    setItems(updatedItems);
     mmkv.set('items', JSON.stringify(updatedItems));
+    setItems(updatedItems);
   };
 
   const rightSwipeActions = () => {
     return (
-      <View style={{ backgroundColor: '#ff8303', justifyContent: 'center', alignItems: 'flex-end' }}>
-        <Text style={{ color: '#1b1a17', paddingHorizontal: 10, fontWeight: '600', paddingHorizontal: 30, paddingVertical: 20 }}>Delete</Text>
+      <View
+        style={{
+          backgroundColor: '#ff8303',
+          justifyContent: 'center',
+          alignItems: 'flex-end',
+        }}>
+        <Text
+          style={{
+            color: '#1b1a17',
+            paddingHorizontal: 10,
+            fontWeight: '600',
+            paddingHorizontal: 30,
+            paddingVertical: 20,
+          }}>
+          Delete
+        </Text>
       </View>
     );
   };
 
-  const renderItemSwipeable = ({ item }) => {
+  const renderItemSwipeable = ({item}) => {
+    if (!items.find(i => i.id === item.id)) {
+      return null; // Don't render anything if the item is deleted
+    }
     return (
       <Swipeable
         renderRightActions={rightSwipeActions}
-        onSwipeableRightOpen={() => handleDeleteItem(item.id)}>
+        onSwipeableRightOpen={() => {
+          setIsSwiping(true);
+          handleDeleteItem(item.id);
+          setIsSwiping(false);
+        }}>
         <Card
           title={item.title}
           isComplete={item.isComplete}
@@ -74,50 +120,37 @@ const HomeScreen = ({ navigation }) => {
           saveFunction={handleSaveItem}
           navigation={navigation}
           id={item.id}
+          isSwiping={isSwiping}
         />
       </Swipeable>
     );
   };
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: offsetX.value }],
-    };
-  });
-
-  const handlePress = () => {
-    offsetX.value = withSpring(-100, {
-      damping: 10,
-      stiffness: 100,
-      velocity: 2,
-    });
-  };
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <View style={styles.dateTimeContainer}>
+      <Animated.View style={[styles.dateTimeContainer, {opacity: fadeAnim}]}>
         <Text style={styles.dateTimeText}>{currentTime}</Text>
         <Text style={styles.dateTimeText}>{currentDate}</Text>
-      </View>
-      <TouchableOpacity style={styles.createTaskButton} onPress={handlePress}>
+      </Animated.View>
+      <TouchableOpacity
+        style={styles.createTaskButton}
+        onPress={() => navigation.navigate('NewItemAdd', {handleAddItem})}>
         <Text style={styles.createTaskButtonText}>Create Task</Text>
       </TouchableOpacity>
 
-      <Animated.View style={[styles.animatedContainer, animatedStyle]}>
-        <FlatList
-          style={styles.flatList}
-          data={items}
-          renderItem={renderItemSwipeable}
-          keyExtractor={(item, index) => index.toString()}
-        />
-      </Animated.View>
+      <FlatList
+        style={styles.flatList}
+        data={items}
+        renderItem={renderItemSwipeable}
+        keyExtractor={(item, index) => index.toString()}
+      />
     </View>
   );
 };
 
 HomeScreen.navigationOptions = {
-  title: 'Home',
+  title: 'Home', // Set the title of the screen
 };
 
 const styles = StyleSheet.create({
@@ -148,11 +181,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
-  animatedContainer: {
-    flex: 1,
-    overflow: 'hidden',
-    borderRadius: 10,
-  },
   flatList: {
     flex: 1,
   },
@@ -162,11 +190,15 @@ const Stack = createNativeStackNavigator();
 
 const App = () => {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{flex: 1}}>
       <NavigationContainer>
         <Stack.Navigator initialRouteName="Home">
           <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="NewItemAdd" component={NewItemAddScreen} options={{ title: 'Add New Item' }} />
+          <Stack.Screen
+            name="NewItemAdd"
+            component={NewItemAddScreen}
+            options={{title: 'Add New Item'}}
+          />
           <Stack.Screen name="ItemDetail" component={ItemDetailsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
